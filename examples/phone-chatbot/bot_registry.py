@@ -51,6 +51,44 @@ class BotType:
         return body
 
 
+class BotRegistration:
+    """Simpler bot registration class for module-based bots."""
+    
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        module: str,
+        config_keys: List[str],
+    ):
+        """Initialize a bot registration.
+        
+        Args:
+            name: Name of the bot
+            description: Description of the bot's purpose
+            module: Python module name to run
+            config_keys: Configuration keys this bot responds to
+        """
+        self.name = name
+        self.description = description
+        self.module = module
+        self.config_keys = config_keys
+        
+    def matches_config(self, body: Dict[str, Any]) -> bool:
+        """Check if this bot matches the given configuration."""
+        for key in self.config_keys:
+            if key in body:
+                return True
+        return False
+        
+    def has_test_mode(self, body: Dict[str, Any]) -> bool:
+        """Check if this bot type is configured for test mode."""
+        for key in self.config_keys:
+            if key in body and body[key].get("testInPrebuilt", False):
+                return True
+        return False
+
+
 class BotRegistry:
     """Registry for managing different bot types."""
 
@@ -58,25 +96,25 @@ class BotRegistry:
         self.bots = {}
         self.bot_validation_rules = []
 
-    def register(self, bot_type: BotType):
-        """Register a bot type."""
-        self.bots[bot_type.name] = bot_type
+    def register(self, bot_registration: BotRegistration):
+        """Register a bot."""
+        self.bots[bot_registration.name] = bot_registration
         return self
 
-    def get_bot(self, name: str) -> BotType:
-        """Get a bot type by name."""
+    def get_bot(self, name: str) -> BotRegistration:
+        """Get a bot by name."""
         return self.bots.get(name)
 
     def detect_bot_type(self, body: Dict[str, Any]) -> Optional[str]:
-        """Detect which bot type to use based on configuration."""
+        """Detect which bot to use based on configuration."""
         # First check for test mode bots
         for name, bot in self.bots.items():
             if bot.has_test_mode(body):
                 return name
 
-        # Then check for specific combinations of settings
+        # Then check for specific configurations
         for name, bot in self.bots.items():
-            if name in body and all(req in body for req in bot.required_settings):
+            if bot.matches_config(body):
                 return name
 
         # Default for dialin settings
@@ -84,22 +122,6 @@ class BotRegistry:
             return DEFAULT_DIALIN_EXAMPLE
 
         return None
-
-    def validate_bot_combination(self, body: Dict[str, Any]) -> List[str]:
-        """Validate that bot types in the configuration are compatible."""
-        errors = []
-        bot_types_in_config = [name for name in self.bots.keys() if name in body]
-
-        # Check each bot type against its incompatible list
-        for bot_name in bot_types_in_config:
-            bot = self.bots[bot_name]
-            for incompatible in bot.incompatible_with:
-                if incompatible in body:
-                    errors.append(
-                        f"Cannot have both '{bot_name}' and '{incompatible}' in the same configuration"
-                    )
-
-        return errors
 
     def setup_configuration(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """Set up bot configuration based on detected bot type."""
@@ -117,21 +139,5 @@ class BotRegistry:
         if "dialin_settings" in body and bot_type_name == DEFAULT_DIALIN_EXAMPLE:
             if bot_type_name not in body:
                 body[bot_type_name] = {}
-
-        # Get the bot type object
-        bot_type = self.get_bot(bot_type_name)
-
-        # Create/update settings for the bot type
-        body = bot_type.create_settings(body)
-
-        # If in test mode, add any required settings
-        if bot_type.has_test_mode(body):
-            body = bot_type.prepare_for_test(body)
-
-        # Validate bot combinations
-        errors = self.validate_bot_combination(body)
-        if errors:
-            error_message = "Invalid configuration: " + "; ".join(errors)
-            raise HTTPException(status_code=400, detail=error_message)
 
         return body

@@ -189,17 +189,17 @@ async def handle_start_request(request: Request) -> JSONResponse:
         # Create the Daily room
         room_details = await create_daily_room(room_url, body)
 
-        # Start the bot
-        await start_bot(room_details, body, bot_type_name)
-
         # Get the bot type
-        bot_type = bot_registry.get_bot(bot_type_name)
+        bot_registration = bot_registry.get_bot(bot_type_name)
+        
+        # Start the bot using the module name, not the bot name
+        await start_bot(room_details, body, bot_registration.module)
 
         # Build the response
         response = {"status": "Bot started", "bot_type": bot_type_name}
 
         # Add room URL for test mode
-        if bot_type.has_test_mode(body):
+        if bot_registration.has_test_mode(body):
             response["room_url"] = room_details["room"]
             # Remove llm_model from response as it's no longer relevant
             if "llm" in body:

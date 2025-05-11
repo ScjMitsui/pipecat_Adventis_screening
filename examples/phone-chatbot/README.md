@@ -258,6 +258,67 @@ The `call_connection_manager.py` file contains mappings for:
 
 You can customize these mappings or integrate with your existing customer database.
 
+## Example 5: Silence Detection Bot
+
+This example demonstrates a bot that can detect prolonged silence during a call, prompt the user, and gracefully end the call if there's no response. It also includes post-call statistics.
+
+### Features
+
+1. **Silence detection**: Detects when caller has been silent for 10+ seconds
+2. **Progressive prompts**: Sends increasingly urgent prompts to re-engage the caller
+3. **Graceful termination**: Ends the call after 3 unanswered prompts
+4. **Call statistics**: Logs call duration, silence events, message counts, etc.
+
+### How It Works
+
+1. User calls in and speaks with the bot
+2. If the user is silent for 10+ seconds, the bot sends a friendly prompt
+3. If silence continues, the bot sends up to 3 prompts before ending the call
+4. When the call ends, detailed statistics are logged
+
+### Testing in Daily Prebuilt (No Actual Phone Calls)
+
+```shell
+curl -X POST "http://localhost:7860/start" \
+	 -H "Content-Type: application/json" \
+	 -d '{
+		 "config": {
+			"silence_detection": {
+			   "testInPrebuilt": true
+			}
+		 }
+	  }'
+```
+
+This returns a Daily room URL. In the room:
+
+1. Join the room and speak with the bot
+2. Stop talking for at least 10 seconds to trigger silence detection
+3. Respond or remain silent to see different bot behaviors
+4. Check the logs for detailed call statistics when the call ends
+
+### Making Actual Phone Calls
+
+To have the bot receive incoming calls:
+
+```shell
+curl -X POST "http://localhost:7860/start" \
+	 -H "Content-Type: application/json" \
+	 -d '{
+		 "config": {
+			"dialin_settings": {
+              "From": "+CALLERS_PHONE",
+              "To": "$PURCHASED_PHONE",
+              "callId": "callid-read-only-string",
+              "callDomain": "callDomain-read-only-string"
+            },
+			"silence_detection": {
+			   "testInPrebuilt": false
+			}
+		 }
+	  }'
+```
+
 ## Configuration Options
 
 ### Request Body Structure
@@ -321,6 +382,9 @@ When making requests to the `/start` endpoint, the config object can include:
     },
     "simple_dialout": {
       "testInPrebuilt": true
+    },
+    "silence_detection": {
+      "testInPrebuilt": true
     }
   }
 }
@@ -346,27 +410,27 @@ When making requests to the `/start` endpoint, the config object can include:
   - `testInPrebuilt`: Test without actual phone calls
 - `simple_dialout`: For simple dialout example:
   - `testInPrebuilt`: Test without actual phone calls
+- `silence_detection`: For silence detection example:
+  - `testInPrebuilt`: Test without actual phone calls
 
 ## Feature Compatibility
 
 The following table shows which feature combinations are supported when making requests to the `/start` endpoint. The table is organized by use case to help you create the correct configuration.
 
-| Use Case                                                        | `call_transfer` | `voicemail_detection` | `simple_dialin` | `simple_dialout` | `dialin_settings` | `dialout_settings` | `operatorNumber` | `testInPrebuilt` | Status           |
-| --------------------------------------------------------------- | --------------- | --------------------- | --------------- | ---------------- | ----------------- | ------------------ | ---------------- | ---------------- | ---------------- |
-| **Basic incoming call handling (simple_dialin)**                | ✗               | ✗                     | ✓               | ✗                | ✓                 | ✗                  | ✗                | ✗                | ✅ Supported     |
-| **Test mode: Simple dialin in Daily Prebuilt**                  | ✗               | ✗                     | ✓               | ✗                | ✗                 | ✗                  | ✗                | ✓                | ✅ Supported     |
-| **Basic outgoing call handling (simple_dialout)**               | ✗               | ✗                     | ✗               | ✓                | ✗                 | ✓                  | ✗                | ✗                | ✅ Supported     |
-| **Test mode: Simple dialout in Daily Prebuilt**                 | ✗               | ✗                     | ✗               | ✓                | ✗                 | ✗                  | ✗                | ✓                | ✅ Supported     |
-| **Standard call transfer (incoming call)**                      | ✓               | ✗                     | ✗               | ✗                | ✓                 | ✗                  | ✓/✗              | ✗                | ✅ Supported     |
-| **Standard voicemail detection (outgoing call)**                | ✗               | ✓                     | ✗               | ✗                | ✗                 | ✓                  | ✗                | ✗                | ✅ Supported     |
-| **Test mode: Call transfer in Daily Prebuilt**                  | ✓               | ✗                     | ✗               | ✗                | ✗                 | ✗                  | ✓                | ✓                | ✅ Supported     |
-| **Test mode: Voicemail detection in Daily Prebuilt**            | ✗               | ✓                     | ✗               | ✗                | ✗                 | ✗                  | ✗                | ✓                | ✅ Supported     |
-| Call transfer requires operatorNumber                           | ✓               | ✗                     | ✗               | ✗                | ✓                 | ✗                  | ✗                | ✓/✗              | ❌ Not Supported |
-| Voicemail detection requires dialout_settings or testInPrebuilt | ✗               | ✓                     | ✗               | ✗                | ✓                 | ✗                  | ✗                | ✓/✗              | ❌ Not Supported |
-| Cannot combine different bot types                              | ✓               | ✓                     | ✗               | ✗                | ✓                 | ✓                  | ✓                | ✓/✗              | ❌ Not Supported |
-| Call_transfer needs dialin_settings in non-test mode            | ✓               | ✗                     | ✗               | ✗                | ✗                 | ✗                  | ✓                | ✗                | ❌ Not Supported |
-| Voicemail_detection needs dialout_settings in non-test mode     | ✗               | ✓                     | ✗               | ✗                | ✗                 | ✗                  | ✗                | ✗                | ❌ Not Supported |
-| Insufficient configuration                                      | ✗               | ✗                     | ✗               | ✗                | ✗                 | ✗                  | ✗                | ✓/✗              | ❌ Not Supported |
+| Use Case                                                        | `call_transfer` | `voicemail_detection` | `simple_dialin` | `simple_dialout` | `silence_detection` | `dialin_settings` | `dialout_settings` | `operatorNumber` | `testInPrebuilt` | Status           |
+| --------------------------------------------------------------- | --------------- | --------------------- | --------------- | ---------------- | ------------------ | ----------------- | ------------------ | ---------------- | ---------------- | ---------------- |
+| **Basic incoming call handling (simple_dialin)**                | ✗               | ✗                     | ✓               | ✗                | ✗                  | ✓                 | ✗                  | ✗                | ✗                | ✅ Supported     |
+| **Test mode: Simple dialin in Daily Prebuilt**                  | ✗               | ✗                     | ✓               | ✗                | ✗                  | ✗                 | ✗                  | ✗                | ✓                | ✅ Supported     |
+| **Basic outgoing call handling (simple_dialout)**               | ✗               | ✗                     | ✗               | ✓                | ✗                  | ✗                 | ✓                  | ✗                | ✗                | ✅ Supported     |
+| **Test mode: Simple dialout in Daily Prebuilt**                 | ✗               | ✗                     | ✗               | ✓                | ✗                  | ✗                 | ✗                  | ✗                | ✓                | ✅ Supported     |
+| **Standard call transfer (incoming call)**                      | ✓               | ✗                     | ✗               | ✗                | ✗                  | ✓                 | ✗                  | ✓/✗              | ✗                | ✅ Supported     |
+| **Standard voicemail detection (outgoing call)**                | ✗               | ✓                     | ✗               | ✗                | ✗                  | ✗                 | ✓                  | ✗                | ✗                | ✅ Supported     |
+| **Silence detection with auto-termination (incoming call)**     | ✗               | ✗                     | ✗               | ✗                | ✓                  | ✓                 | ✗                  | ✗                | ✗                | ✅ Supported     |
+| **Test mode: Call transfer in Daily Prebuilt**                  | ✓               | ✗                     | ✗               | ✗                | ✗                  | ✗                 | ✗                  | ✓                | ✓                | ✅ Supported     |
+| **Test mode: Voicemail detection in Daily Prebuilt**            | ✗               | ✓                     | ✗               | ✗                | ✗                  | ✗                 | ✗                  | ✗                | ✓                | ✅ Supported     |
+| **Test mode: Silence detection in Daily Prebuilt**              | ✗               | ✗                     | ✗               | ✗                | ✓                  | ✗                 | ✗                  | ✗                | ✓                | ✅ Supported     |
+| Call transfer requires operatorNumber                           | ✓               | ✗                     | ✗               | ✗                | ✗                  | ✓                 | ✗                  | ✗                | ✓/✗              | ❌ Not Supported |
+| Voicemail detection requires dialout_settings or testInPrebuilt | ✗               | ✓                     | ✗               | ✗                | ✗                  | ✓                 | ✗                  | ✗                | ✓/✗              | ❌ Not Supported |
 
 ### Legend:
 
